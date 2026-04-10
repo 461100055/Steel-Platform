@@ -10,12 +10,16 @@ User = get_user_model()
 
 USERNAME = "admin"
 PASSWORD = "12345678"
+EMAIL = "admin@test.com"
 
-user, created = User.objects.get_or_create(username=USERNAME)
-
+user, created = User.objects.get_or_create(username=USERNAME, defaults={"email": EMAIL})
+user.email = EMAIL
 user.is_superuser = True
 user.is_staff = True
+user.is_active = True
 user.set_password(PASSWORD)
 user.save()
 
-print("✅ Admin user is ready (password reset).")
+print("=== ADMIN USER READY ===")
+print(f"username: {USERNAME}")
+print("password has been reset successfully")
