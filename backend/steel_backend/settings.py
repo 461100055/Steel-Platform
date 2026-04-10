@@ -5,24 +5,49 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# =========================
-# Security
-# =========================
+# =========================================================
+# Core settings
+# =========================================================
 SECRET_KEY = os.getenv("SECRET_KEY", "steel-platform-dev-secret-key-change-this")
-DEBUG = os.getenv("DEBUG", "False") == "True"
 
+# في الإنتاج على Railway اجعل DEBUG=False من Variables
+DEBUG = os.getenv("DEBUG", "False").strip().lower() == "true"
+
+# =========================================================
+# Hosts / CORS / CSRF
+# =========================================================
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv(
         "ALLOWED_HOSTS",
-        "127.0.0.1,localhost"
+        "127.0.0.1,localhost,steel-platform-production-431a.up.railway.app,.up.railway.app,.railway.app"
     ).split(",")
     if host.strip()
 ]
 
-# =========================
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        "http://127.0.0.1,http://localhost,https://steel-platform-p1qziyxai-461100055.vercel.app"
+    ).split(",")
+    if origin.strip()
+]
+
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://127.0.0.1:5173,http://localhost:5173,https://steel-platform-p1qziyxai-461100055.vercel.app"
+    ).split(",")
+    if origin.strip()
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+# =========================================================
 # Applications
-# =========================
+# =========================================================
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -38,13 +63,14 @@ INSTALLED_APPS = [
     'api',
 ]
 
-# =========================
+# =========================================================
 # Middleware
-# =========================
+# =========================================================
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -71,50 +97,51 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'steel_backend.wsgi.application'
-ASGI_APPLICATION = 'steel_backend.asgi.application'
 
-# =========================
+# =========================================================
 # Database
-# Railway PostgreSQL in production
-# SQLite locally as fallback
-# =========================
-DATABASE_URL = os.getenv("DATABASE_URL")
+# =========================================================
+# الأفضل في Railway استخدام PostgreSQL عبر DATABASE_URL
+# إذا لم تكن موجودة، يرجع مؤقتًا إلى SQLite
+DATABASES = {
+    'default': dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+        ssl_require=False
+    )
+}
 
-if DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.parse(
-            DATABASE_URL,
-            conn_max_age=600,
-            ssl_require=False,
-        )
-    }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
-
-# =========================
+# =========================================================
 # Password validation
-# =========================
-AUTH_PASSWORD_VALIDATORS = []
+# =========================================================
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {'min_length': 8},
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+]
 
-# =========================
+# =========================================================
 # Internationalization
-# =========================
+# =========================================================
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Riyadh'
 USE_I18N = True
 USE_TZ = True
 
-# =========================
+# =========================================================
 # Static / Media
-# =========================
+# =========================================================
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static'] if (BASE_DIR / 'static').exists() else []
+
+# WhiteNoise for production static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = '/media/'
@@ -122,38 +149,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# =========================
-# CORS / CSRF
-# =========================
-CORS_ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv(
-        "CORS_ALLOWED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173"
-    ).split(",")
-    if origin.strip()
-]
-
-CSRF_TRUSTED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv(
-        "CSRF_TRUSTED_ORIGINS",
-        "http://127.0.0.1:5173,http://localhost:5173"
-    ).split(",")
-    if origin.strip()
-]
-
-CORS_ALLOW_CREDENTIALS = True
-
-# في بيئة التطوير المحلي فقط يمكن السماح الكامل لو احتجت
-if DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = True
-else:
-    CORS_ALLOW_ALL_ORIGINS = False
-
-# =========================
+# =========================================================
 # DRF / JWT
-# =========================
+# =========================================================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -164,7 +162,32 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+# =========================================================
+# Security settings for public production deployment
+# =========================================================
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# على Railway خلف Proxy، لذلك الأفضل تفعيل هذا فقط في الإنتاج
+SECURE_SSL_REDIRECT = not DEBUG
+
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+X_FRAME_OPTIONS = 'DENY'
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# HSTS يفعّل فقط عند الإنتاج
+SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
