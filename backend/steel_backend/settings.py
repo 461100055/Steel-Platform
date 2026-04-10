@@ -168,3 +168,18 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+import os
+from django.contrib.auth import get_user_model
+
+if os.getenv("CREATE_SUPERUSER") == "True":
+    try:
+        User = get_user_model()
+        if not User.objects.filter(username="admin").exists():
+            User.objects.create_superuser(
+                username="admin",
+                email="admin@test.com",
+                password="12345678"
+            )
+            print("✅ Superuser created successfully")
+    except Exception as e:
+        print(f"❌ Error creating superuser: {e}")
