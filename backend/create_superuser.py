@@ -4,20 +4,18 @@ import django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "steel_backend.settings")
 django.setup()
 
-from django.contrib.auth import get_user_model  # noqa: E402
+from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-USERNAME = os.getenv("DJANGO_SUPERUSER_USERNAME", "admin")
-EMAIL = os.getenv("DJANGO_SUPERUSER_EMAIL", "admin@test.com")
-PASSWORD = os.getenv("DJANGO_SUPERUSER_PASSWORD", "12345678")
+USERNAME = "admin"
+PASSWORD = "12345678"
 
-if not User.objects.filter(username=USERNAME).exists():
-    User.objects.create_superuser(
-        username=USERNAME,
-        email=EMAIL,
-        password=PASSWORD,
-    )
-    print(f"Superuser '{USERNAME}' created successfully.")
-else:
-    print(f"Superuser '{USERNAME}' already exists.")
+user, created = User.objects.get_or_create(username=USERNAME)
+
+user.is_superuser = True
+user.is_staff = True
+user.set_password(PASSWORD)
+user.save()
+
+print("✅ Admin user is ready (password reset).")
