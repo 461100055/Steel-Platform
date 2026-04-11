@@ -226,11 +226,15 @@ export default function ProductDetails() {
 
         <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
           <div className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white">
-            <img
-              src={getProductImage(product)}
-              alt={String(product.name)}
-              className="aspect-square w-full object-cover"
-            />
+          <img
+            src={product.image}
+            alt={product.name}
+            style={{
+            width: "100%",
+            height: "200px",
+            objectFit: "cover",
+         }}
+        />
           </div>
 
           <div>
