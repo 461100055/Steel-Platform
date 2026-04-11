@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
+import { Alert, AlertDescription } from '../../components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -95,6 +96,7 @@ export default function SupplierProductForm() {
   const [newSpecValue, setNewSpecValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingProduct, setIsLoadingProduct] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [pageError, setPageError] = useState('');
 
   useEffect(() => {
@@ -143,21 +145,55 @@ export default function SupplierProductForm() {
     loadProduct();
   }, [id, isEditMode]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadToCloudinary = async (file: File) => {
+    const cloudName = 'dmrnepldy';
+    const uploadPreset = 'unsigned_preset';
+
+    const uploadFormData = new FormData();
+    uploadFormData.append('file', file);
+    uploadFormData.append('upload_preset', uploadPreset);
+
+    const response = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+      {
+        method: 'POST',
+        body: uploadFormData,
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || !data?.secure_url) {
+      throw new Error(data?.error?.message || 'Image upload to Cloudinary failed.');
+    }
+
+    return data.secure_url as string;
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const image = reader.result as string;
-      setImagePreview(image);
+    try {
+      setIsUploadingImage(true);
+      setPageError('');
+
+      const imageUrl = await uploadToCloudinary(file);
+
       setFormData((prev) => ({
         ...prev,
-        image,
+        image: imageUrl,
       }));
-      toast.success('Image selected.');
-    };
-    reader.readAsDataURL(file);
+
+      setImagePreview(imageUrl);
+      toast.success('Image uploaded successfully.');
+    } catch (error: any) {
+      const message = extractErrorMessage(error);
+      toast.error(message);
+    } finally {
+      setIsUploadingImage(false);
+      e.target.value = '';
+    }
   };
 
   const removeImage = () => {
@@ -236,7 +272,7 @@ export default function SupplierProductForm() {
 
     if (formData.image && isBase64Image(formData.image)) {
       throw new Error(
-        'The backend does not accept local uploaded image data yet. Please use a direct image URL instead.'
+        'Image must be uploaded to Cloudinary first. Base64 image data is not supported.'
       );
     }
   };
@@ -464,7 +500,7 @@ export default function SupplierProductForm() {
               <CardHeader>
                 <CardTitle>Product Image</CardTitle>
                 <CardDescription>
-                  Use a direct image URL. Local file upload is not supported by the current backend.
+                  Upload an image directly to Cloudinary or paste a public image URL.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -482,14 +518,14 @@ export default function SupplierProductForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Or select a local file for preview only</Label>
+                  <Label>Or upload a local file</Label>
                   <div className="flex items-start gap-4">
                     {imagePreview ? (
                       <div className="relative h-64 w-64 overflow-hidden rounded-lg border-2 border-[#E5E7EB]">
                         <ImageWithFallback
                           src={imagePreview}
                           alt="Product preview"
-                          className="h-full w-full object-cover"
+                          className="h-full w-full object-contain bg-white"
                         />
                         <Button
                           type="button"
@@ -504,23 +540,28 @@ export default function SupplierProductForm() {
                     ) : (
                       <label className="flex h-64 w-64 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-[#E5E7EB] transition-colors hover:border-[#1C4D8D]">
                         <ImageIcon className="mb-2 h-12 w-12 text-[#6B7280]" />
-                        <span className="mb-1 text-sm text-[#6B7280]">Select image</span>
-                        <span className="text-xs text-[#9CA3AF]">Preview only</span>
+                        <span className="mb-1 text-sm text-[#6B7280]">
+                          {isUploadingImage ? 'Uploading...' : 'Select image'}
+                        </span>
+                        <span className="text-xs text-[#9CA3AF]">
+                          {isUploadingImage ? 'Please wait' : 'Cloudinary upload'}
+                        </span>
                         <input
                           type="file"
                           accept="image/*"
                           onChange={handleImageUpload}
                           className="hidden"
+                          disabled={isUploadingImage}
                         />
                       </label>
                     )}
 
                     <div className="flex-1">
                       <p className="mb-2 text-sm text-[#6B7280]">
-                        If you use local upload, it will preview only.
+                        Selecting a file uploads it to Cloudinary automatically.
                       </p>
                       <p className="text-sm text-[#6B7280]">
-                        To save successfully, paste a direct public image URL in the field above.
+                        After upload, the public image URL will be saved in the field above.
                       </p>
                     </div>
                   </div>
@@ -614,10 +655,16 @@ export default function SupplierProductForm() {
                 <Button
                   type="submit"
                   className="bg-[#0F2854] hover:bg-[#1C4D8D]"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isUploadingImage}
                 >
                   <Save className="mr-2 h-4 w-4" />
-                  {isSubmitting ? 'Saving...' : isEditMode ? 'Update Product' : 'Create Product'}
+                  {isSubmitting
+                    ? 'Saving...'
+                    : isUploadingImage
+                    ? 'Uploading Image...'
+                    : isEditMode
+                    ? 'Update Product'
+                    : 'Create Product'}
                 </Button>
               </div>
             </div>
