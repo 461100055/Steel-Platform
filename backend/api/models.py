@@ -70,6 +70,7 @@ class SupplierProfile(models.Model):
 
 
 class Product(models.Model):
+    image = models.ImageField(upload_to='products/')
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),

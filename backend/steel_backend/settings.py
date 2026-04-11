@@ -1,8 +1,12 @@
+from django.conf import settings
+from django.conf.urls.static import static
 from pathlib import Path
 from datetime import timedelta
 import cloudinary
 import os
 import dj_database_url
+
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -157,6 +161,8 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # هذه تبقى للتوافق فقط، لكن التخزين الفعلي سيكون على Cloudinary
+MEDIA_URL = '/media/'
+MEDIA_ROOT = '/app/media'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
