@@ -10,8 +10,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Core settings
 # =========================================================
 SECRET_KEY = os.getenv("SECRET_KEY", "steel-platform-dev-secret-key-change-this")
-
-# في الإنتاج على Railway اجعل DEBUG=False من Variables
 DEBUG = os.getenv("DEBUG", "False").strip().lower() == "true"
 
 # =========================================================
@@ -30,29 +28,30 @@ CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
         "CSRF_TRUSTED_ORIGINS",
-        "http://127.0.0.1,http://localhost,https://steel-platform-p1qziyxai-461100055.vercel.app"
+        "http://127.0.0.1,http://localhost,https://steel-platform.vercel.app,https://steel-platform-p1qziyxai-461100055.vercel.app"
     ).split(",")
     if origin.strip()
 ]
-
-cloudinary.config(
-    cloud_name="dmrnepldy",
-    api_key=os.getenv("CLOUDINARY_API_KEY"),
-    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
-)
-
-
 
 CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in os.getenv(
         "CORS_ALLOWED_ORIGINS",
-        "http://127.0.0.1:5173,http://localhost:5173,https://steel-platform-p1qziyxai-461100055.vercel.app"
+        "http://127.0.0.1:5173,http://localhost:5173,https://steel-platform.vercel.app,https://steel-platform-p1qziyxai-461100055.vercel.app"
     ).split(",")
     if origin.strip()
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+# =========================================================
+# Cloudinary
+# =========================================================
+cloudinary.config(
+    cloud_name="dmrnepldy",
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+)
 
 # =========================================================
 # Applications
@@ -64,6 +63,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
     'cloudinary',
     'cloudinary_storage',
 
@@ -112,8 +112,6 @@ WSGI_APPLICATION = 'steel_backend.wsgi.application'
 # =========================================================
 # Database
 # =========================================================
-# الأفضل في Railway استخدام PostgreSQL عبر DATABASE_URL
-# إذا لم تكن موجودة، يرجع مؤقتًا إلى SQLite
 DATABASES = {
     'default': dj_database_url.config(
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
@@ -152,9 +150,13 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# WhiteNoise for production static files
+# WhiteNoise
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Cloudinary for uploaded media
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
+# هذه تبقى للتوافق فقط، لكن التخزين الفعلي سيكون على Cloudinary
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -184,8 +186,6 @@ SIMPLE_JWT = {
 # Security settings for public production deployment
 # =========================================================
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-
-# على Railway خلف Proxy، لذلك الأفضل تفعيل هذا فقط في الإنتاج
 SECURE_SSL_REDIRECT = not DEBUG
 
 SESSION_COOKIE_SECURE = not DEBUG
@@ -198,7 +198,6 @@ X_FRAME_OPTIONS = 'DENY'
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 
-# HSTS يفعّل فقط عند الإنتاج
 SECURE_HSTS_SECONDS = 31536000 if not DEBUG else 0
 SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
 SECURE_HSTS_PRELOAD = not DEBUG
