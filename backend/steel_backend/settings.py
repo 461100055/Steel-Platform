@@ -20,30 +20,20 @@ DEBUG = os.getenv("DEBUG", "False").strip().lower() == "true"
 # Hosts / CORS / CSRF
 # =========================================================
 ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.getenv(
-        "ALLOWED_HOSTS",
-        "127.0.0.1,localhost,steel-platform-production-431a.up.railway.app,.up.railway.app,.railway.app"
-    ).split(",")
-    if host.strip()
-]
-
-CSRF_TRUSTED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv(
-        "CSRF_TRUSTED_ORIGINS",
-        "http://127.0.0.1,http://localhost,https://steel-platform.vercel.app,https://steel-platform-p1qziyxai-461100055.vercel.app"
-    ).split(",")
-    if origin.strip()
+    "127.0.0.1",
+    "localhost",
+    ".railway.app",
 ]
 
 CORS_ALLOWED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv(
-        "CORS_ALLOWED_ORIGINS",
-        "http://127.0.0.1:5173,http://localhost:5173,https://steel-platform.vercel.app,https://steel-platform-p1qziyxai-461100055.vercel.app"
-    ).split(",")
-    if origin.strip()
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://YOUR-VERCEL-DOMAIN.vercel.app",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://YOUR-VERCEL-DOMAIN.vercel.app",
+    "https://*.railway.app",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
