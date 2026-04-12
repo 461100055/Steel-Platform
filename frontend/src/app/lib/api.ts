@@ -30,7 +30,7 @@ function clearAuthData() {
   localStorage.removeItem('steel_platform_user');
 }
 
-function getAuthHeaders(includeJson = true): HeadersInit {
+function getAuthHeaders(includeJson = false): HeadersInit {
   const token = getAccessToken();
 
   return {
@@ -83,15 +83,16 @@ async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const includeJson =
-    options.headers && options.headers instanceof Headers
-      ? !options.headers.has('Content-Type') || options.headers.get('Content-Type') === 'application/json'
-      : true;
+  const method = String(options.method || 'GET').toUpperCase();
+  const shouldSendJsonHeader =
+    method !== 'GET' &&
+    method !== 'DELETE' &&
+    !(options.body instanceof FormData);
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
     headers: {
-      ...getAuthHeaders(includeJson),
+      ...getAuthHeaders(shouldSendJsonHeader),
       ...(options.headers || {}),
     },
   });
@@ -391,7 +392,7 @@ export async function registerUser(data: any) {
 export async function getCurrentUser(): Promise<User> {
   const response = await fetch(`${API_BASE_URL}/auth/me/`, {
     method: 'GET',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(false),
   });
 
   const data = await handleResponse(response);
@@ -442,7 +443,7 @@ export async function getProductById(productId: string | number): Promise<Produc
 export async function createProduct(productData: any): Promise<Product> {
   const response = await fetch(`${API_BASE_URL}/products/`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(true),
     body: JSON.stringify(productData),
   });
 
@@ -455,7 +456,7 @@ export async function updateProduct(
 ): Promise<Product> {
   const response = await fetch(`${API_BASE_URL}/products/${productId}/`, {
     method: 'PUT',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(true),
     body: JSON.stringify(productData),
   });
 
@@ -468,7 +469,7 @@ export async function patchProduct(
 ): Promise<Product> {
   const response = await fetch(`${API_BASE_URL}/products/${productId}/`, {
     method: 'PATCH',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(true),
     body: JSON.stringify(productData),
   });
 
@@ -498,7 +499,7 @@ export async function deleteProduct(productId: string | number) {
 export async function getOrders(): Promise<Order[]> {
   const response = await fetch(`${API_BASE_URL}/orders/`, {
     method: 'GET',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(false),
   });
 
   const data = await handleResponse(response);
@@ -508,7 +509,7 @@ export async function getOrders(): Promise<Order[]> {
 export async function getOrderById(orderId: string | number): Promise<Order> {
   const response = await fetch(`${API_BASE_URL}/orders/${orderId}/`, {
     method: 'GET',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(false),
   });
 
   return handleResponse(response);
@@ -517,7 +518,7 @@ export async function getOrderById(orderId: string | number): Promise<Order> {
 export async function createOrder(orderData: any): Promise<Order> {
   const response = await fetch(`${API_BASE_URL}/orders/create/`, {
     method: 'POST',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(true),
     body: JSON.stringify(orderData),
   });
 
@@ -527,7 +528,7 @@ export async function createOrder(orderData: any): Promise<Order> {
 export async function getSupplierOrders(): Promise<Order[]> {
   const response = await fetch(`${API_BASE_URL}/supplier/orders/`, {
     method: 'GET',
-    headers: getAuthHeaders(),
+    headers: getAuthHeaders(false),
   });
 
   const data = await handleResponse(response);
@@ -535,13 +536,34 @@ export async function getSupplierOrders(): Promise<Order[]> {
 }
 
 /* =========================
-   Admin Analytics API
+   Admin API
 ========================= */
 
 export async function getAdminAnalytics(): Promise<AdminAnalyticsResponse> {
   return apiRequest<AdminAnalyticsResponse>('/admin/analytics/', {
     method: 'GET',
   });
+}
+
+export async function getAdminUsers(): Promise<User[]> {
+  const data = await apiRequest<any>('/admin/users/', {
+    method: 'GET',
+  });
+  return normalizeListResponse<User>(data);
+}
+
+export async function getAdminProducts(): Promise<Product[]> {
+  const data = await apiRequest<any>('/admin/products/', {
+    method: 'GET',
+  });
+  return normalizeListResponse<Product>(data);
+}
+
+export async function getAdminSuppliers(): Promise<User[]> {
+  const data = await apiRequest<any>('/admin/suppliers/', {
+    method: 'GET',
+  });
+  return normalizeListResponse<User>(data);
 }
 
 /* =========================
