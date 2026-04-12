@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '../../components/ui/alert';
+import { API_BASE_URL, getAdminProducts } from '../../lib/api';
 
 type ProductStatus = 'all' | 'pending' | 'approved' | 'rejected';
 
@@ -47,9 +48,6 @@ type AdminProduct = {
   image: string;
   isActive: boolean;
 };
-
-const API_BASE_URL =
-  ((import.meta as any)?.env?.VITE_API_URL as string) || 'http://127.0.0.1:8000/api';
 
 function getAccessToken() {
   return localStorage.getItem('access') || '';
@@ -81,11 +79,15 @@ function getErrorMessage(data: any, fallback = 'Request failed.') {
 
 async function apiRequest(path: string, options: RequestInit = {}) {
   const token = getAccessToken();
+  const method = String(options.method || 'GET').toUpperCase();
+  const isFormData = options.body instanceof FormData;
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(method !== 'GET' && method !== 'DELETE' && !isFormData
+        ? { 'Content-Type': 'application/json' }
+        : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
@@ -131,12 +133,6 @@ function normalizeProduct(apiProduct: any): AdminProduct {
   };
 }
 
-async function getAdminProducts() {
-  const data = await apiRequest('/admin/products/');
-  const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
-  return list.map(normalizeProduct);
-}
-
 async function approveAdminProduct(productId: string) {
   const data = await apiRequest(`/admin/products/${productId}/approve/`, {
     method: 'POST',
@@ -178,7 +174,7 @@ export default function AdminProducts() {
 
       setPageError('');
       const data = await getAdminProducts();
-      setProducts(data);
+      setProducts((data || []).map(normalizeProduct));
     } catch (error: any) {
       console.error('Failed to load admin products:', error);
       setPageError(error?.message || 'Failed to load products.');
