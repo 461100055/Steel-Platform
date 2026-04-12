@@ -25,12 +25,12 @@ import {
   CheckCircle,
   XCircle,
   Building2,
-  Award,
   AlertTriangle,
   Loader2,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { toast } from 'sonner';
+import { API_BASE_URL, getAdminSuppliers } from '../../lib/api';
 
 type SupplierStatusFilter =
   | 'all'
@@ -59,20 +59,45 @@ type AdminSupplier = {
   joinedDate: string;
 };
 
-const API_BASE_URL =
-  ((import.meta as any)?.env?.VITE_API_URL as string) || 'http://127.0.0.1:8000/api';
-
 function getAccessToken() {
   return localStorage.getItem('access') || '';
 }
 
+function getErrorMessage(data: any, fallback = 'Request failed.') {
+  if (!data) return fallback;
+
+  if (typeof data === 'string') return data;
+  if (typeof data?.detail === 'string') return data.detail;
+  if (typeof data?.message === 'string') return data.message;
+  if (typeof data?.error === 'string') return data.error;
+
+  if (typeof data === 'object') {
+    const firstKey = Object.keys(data)[0];
+    const firstValue = data[firstKey];
+
+    if (Array.isArray(firstValue) && firstValue.length > 0) {
+      return String(firstValue[0]);
+    }
+
+    if (typeof firstValue === 'string') {
+      return firstValue;
+    }
+  }
+
+  return fallback;
+}
+
 async function apiRequest(path: string, options: RequestInit = {}) {
   const token = getAccessToken();
+  const method = String(options.method || 'GET').toUpperCase();
+  const isFormData = options.body instanceof FormData;
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(method !== 'GET' && method !== 'DELETE' && !isFormData
+        ? { 'Content-Type': 'application/json' }
+        : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
@@ -86,8 +111,7 @@ async function apiRequest(path: string, options: RequestInit = {}) {
   }
 
   if (!response.ok) {
-    const message = data?.detail || data?.message || 'Request failed.';
-    throw new Error(message);
+    throw new Error(getErrorMessage(data, 'Request failed.'));
   }
 
   return data;
@@ -109,13 +133,8 @@ function normalizeSupplier(apiUser: any): AdminSupplier {
     city: String(apiUser?.city || ''),
     phone: String(apiUser?.phone || ''),
     status: String(apiUser?.status || 'pending').toLowerCase() as SupplierStatus,
-    joinedDate: String(apiUser?.joined_date || ''),
+    joinedDate: String(apiUser?.joined_date || apiUser?.date_joined || ''),
   };
-}
-
-async function getAdminSuppliers() {
-  const data = await apiRequest('/admin/suppliers/');
-  return Array.isArray(data) ? data.map(normalizeSupplier) : [];
 }
 
 async function approveSupplier(supplierId: string) {
@@ -123,7 +142,7 @@ async function approveSupplier(supplierId: string) {
     method: 'POST',
     body: JSON.stringify({}),
   });
-  return normalizeSupplier(data?.user || {});
+  return normalizeSupplier(data?.user || data);
 }
 
 async function rejectSupplier(supplierId: string) {
@@ -131,7 +150,7 @@ async function rejectSupplier(supplierId: string) {
     method: 'POST',
     body: JSON.stringify({}),
   });
-  return normalizeSupplier(data?.user || {});
+  return normalizeSupplier(data?.user || data);
 }
 
 export default function AdminSuppliers() {
@@ -148,7 +167,7 @@ export default function AdminSuppliers() {
         setIsLoading(true);
         setPageError('');
         const data = await getAdminSuppliers();
-        setSuppliers(data);
+        setSuppliers((data || []).map(normalizeSupplier));
       } catch (error: any) {
         console.error('Failed to load suppliers:', error);
         setPageError(error?.message || 'Failed to load suppliers.');
@@ -199,10 +218,11 @@ export default function AdminSuppliers() {
   };
 
   const filteredSuppliers = useMemo(() => {
-    return suppliers.filter((supplier) => {
-      const query = searchQuery.toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
 
+    return suppliers.filter((supplier) => {
       const matchesSearch =
+        !query ||
         supplier.name.toLowerCase().includes(query) ||
         supplier.email.toLowerCase().includes(query) ||
         supplier.company.toLowerCase().includes(query) ||
