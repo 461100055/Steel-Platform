@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '../../components/ui/alert';
+import { API_BASE_URL, getAdminUsers } from '../../lib/api';
 
 type ApiUserRole =
   | 'buyer'
@@ -83,9 +84,6 @@ type EditFormState = {
   status: string;
   permissions: string[];
 };
-
-const API_BASE_URL =
-  ((import.meta as any)?.env?.VITE_API_URL as string) || 'http://127.0.0.1:8000/api';
 
 const ADMIN_PERMISSION_OPTIONS = [
   'manage_users',
@@ -233,11 +231,15 @@ function normalizeUser(apiUser: any): AdminUser {
 
 async function apiRequest(path: string, options: RequestInit = {}) {
   const token = getAccessToken();
+  const method = String(options.method || 'GET').toUpperCase();
+  const isFormData = options.body instanceof FormData;
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(method !== 'GET' && method !== 'DELETE' && !isFormData
+        ? { 'Content-Type': 'application/json' }
+        : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
@@ -255,12 +257,6 @@ async function apiRequest(path: string, options: RequestInit = {}) {
   }
 
   return data;
-}
-
-async function getAdminUsers() {
-  const data = await apiRequest('/admin/users/');
-  const list = Array.isArray(data) ? data : Array.isArray(data?.results) ? data.results : [];
-  return list.map(normalizeUser);
 }
 
 async function updateAdminUser(userId: string, payload: Partial<EditFormState>) {
@@ -316,7 +312,7 @@ export default function AdminUsers() {
 
       setPageError('');
       const data = await getAdminUsers();
-      setUsers(data);
+      setUsers((data || []).map(normalizeUser));
     } catch (error: any) {
       console.error('Failed to load admin users:', error);
       setPageError(error?.message || 'Failed to load users.');
