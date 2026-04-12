@@ -20,6 +20,15 @@ import {
   SelectValue,
 } from '../../components/ui/select';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../../components/ui/dialog';
+import { Label } from '../../components/ui/label';
+import {
   Search,
   Filter,
   CheckCircle,
@@ -29,12 +38,15 @@ import {
   Loader2,
   RefreshCcw,
   Package,
+  Edit,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { API_BASE_URL, getAdminProducts } from '../../lib/api';
 
 type ProductStatus = 'all' | 'pending' | 'approved' | 'rejected';
+
+type ProductRowStatus = 'pending' | 'approved' | 'rejected';
 
 type AdminProduct = {
   id: string;
@@ -44,9 +56,40 @@ type AdminProduct = {
   price: number;
   stock: number;
   submittedDate: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: ProductRowStatus;
   image: string;
   isActive: boolean;
+};
+
+type EditProductForm = {
+  name: string;
+  category: string;
+  price: string;
+  stock: string;
+  status: ProductRowStatus;
+  image: string;
+};
+
+const PRODUCT_CATEGORIES = [
+  'Steel Sheets',
+  'Steel Pipes',
+  'Steel Coils',
+  'Rebar',
+  'Steel Beams',
+  'Structural Steel',
+  'Galvanized Steel',
+  'Stainless Steel',
+  'Carbon Steel',
+  'Alloy Steel',
+];
+
+const INITIAL_EDIT_FORM: EditProductForm = {
+  name: '',
+  category: '',
+  price: '',
+  stock: '',
+  status: 'pending',
+  image: '',
 };
 
 function getAccessToken() {
@@ -127,7 +170,7 @@ function normalizeProduct(apiProduct: any): AdminProduct {
     submittedDate: String(
       apiProduct?.created_at || apiProduct?.submitted_date || apiProduct?.submittedDate || ''
     ),
-    status: String(apiProduct?.status || 'pending') as 'pending' | 'approved' | 'rejected',
+    status: String(apiProduct?.status || 'pending') as ProductRowStatus,
     image: String(apiProduct?.image || ''),
     isActive: Boolean(apiProduct?.is_active),
   };
@@ -149,6 +192,14 @@ async function rejectAdminProduct(productId: string) {
   return normalizeProduct(data?.product ?? data);
 }
 
+async function updateAdminProduct(productId: string, payload: any) {
+  const data = await apiRequest(`/admin/products/${productId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  return normalizeProduct(data?.product ?? data);
+}
+
 async function deleteAdminProduct(productId: string) {
   await apiRequest(`/admin/products/${productId}/`, {
     method: 'DELETE',
@@ -163,6 +214,11 @@ export default function AdminProducts() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [pageError, setPageError] = useState('');
   const [processingProductId, setProcessingProductId] = useState<string | null>(null);
+
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<AdminProduct | null>(null);
+  const [editForm, setEditForm] = useState<EditProductForm>(INITIAL_EDIT_FORM);
+  const [isSaving, setIsSaving] = useState(false);
 
   const loadProducts = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
     try {
@@ -244,6 +300,85 @@ export default function AdminProducts() {
       toast.error(error?.message || 'Failed to delete product');
     } finally {
       setProcessingProductId(null);
+    }
+  };
+
+  const handleEdit = (product: AdminProduct) => {
+    setSelectedProduct(product);
+    setEditForm({
+      name: product.name || '',
+      category: product.category || '',
+      price: String(product.price ?? ''),
+      stock: String(product.stock ?? ''),
+      status: product.status,
+      image: product.image || '',
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDialogChange = (open: boolean) => {
+    setIsEditDialogOpen(open);
+    if (!open) {
+      setSelectedProduct(null);
+      setEditForm(INITIAL_EDIT_FORM);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedProduct) return;
+
+    const trimmedName = editForm.name.trim();
+    const trimmedCategory = editForm.category.trim();
+    const trimmedImage = editForm.image.trim();
+
+    if (!trimmedName) {
+      toast.error('Product name is required');
+      return;
+    }
+
+    if (!trimmedCategory) {
+      toast.error('Category is required');
+      return;
+    }
+
+    if (!editForm.price || Number(editForm.price) <= 0) {
+      toast.error('Price must be greater than zero');
+      return;
+    }
+
+    if (Number(editForm.stock) < 0) {
+      toast.error('Stock must be zero or greater');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      const payload = {
+        name: trimmedName,
+        category: trimmedCategory,
+        price: Number(editForm.price),
+        inventory: Number(editForm.stock),
+        status: editForm.status,
+        image: trimmedImage,
+      };
+
+      const updatedProduct = await updateAdminProduct(selectedProduct.id, payload);
+
+      setProducts((prev) =>
+        prev.map((product) =>
+          product.id === selectedProduct.id ? updatedProduct : product
+        )
+      );
+
+      toast.success(`"${updatedProduct.name}" has been updated successfully`);
+      setIsEditDialogOpen(false);
+      setSelectedProduct(null);
+      setEditForm(INITIAL_EDIT_FORM);
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update product');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -552,6 +687,16 @@ export default function AdminProducts() {
 
                           <TableCell>
                             <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleEdit(product)}
+                                title="Edit product"
+                                disabled={isProcessing}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+
                               {product.status === 'pending' && (
                                 <>
                                   <Button
@@ -606,6 +751,151 @@ export default function AdminProducts() {
             </div>
           </CardContent>
         </Card>
+
+        <Dialog open={isEditDialogOpen} onOpenChange={handleDialogChange}>
+          <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Product</DialogTitle>
+              <DialogDescription>
+                Update product information from the admin panel
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="product_name">Product Name</Label>
+                <Input
+                  id="product_name"
+                  value={editForm.name}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="product_category">Category</Label>
+                <Select
+                  value={editForm.category}
+                  onValueChange={(value) =>
+                    setEditForm((prev) => ({ ...prev, category: value }))
+                  }
+                >
+                  <SelectTrigger id="product_category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRODUCT_CATEGORIES.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="product_price">Price</Label>
+                  <Input
+                    id="product_price"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editForm.price}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({ ...prev, price: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="product_stock">Stock</Label>
+                  <Input
+                    id="product_stock"
+                    type="number"
+                    min="0"
+                    value={editForm.stock}
+                    onChange={(e) =>
+                      setEditForm((prev) => ({ ...prev, stock: e.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="product_status">Status</Label>
+                  <Select
+                    value={editForm.status}
+                    onValueChange={(value) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        status: value as ProductRowStatus,
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="product_status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="approved">Approved</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="product_image">Image URL</Label>
+                <Input
+                  id="product_image"
+                  value={editForm.image}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({ ...prev, image: e.target.value }))
+                  }
+                  placeholder="https://..."
+                />
+              </div>
+
+              {editForm.image && (
+                <div className="space-y-2">
+                  <Label>Preview</Label>
+                  <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-lg border border-[#E5E7EB]">
+                    <img
+                      src={editForm.image}
+                      alt="Product preview"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => handleDialogChange(false)}
+                disabled={isSaving}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveEdit}
+                className="bg-[#0F2854] hover:bg-[#1C4D8D]"
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Changes'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
