@@ -37,6 +37,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = True
 
 # =========================================================
 # Cloudinary
@@ -72,9 +73,9 @@ INSTALLED_APPS = [
 # Middleware
 # =========================================================
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # لازم يكون أول واحد
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
 
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
