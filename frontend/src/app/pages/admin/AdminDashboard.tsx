@@ -18,6 +18,12 @@ import {
 import { Badge } from '../../components/ui/badge';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { toast } from 'sonner';
+import {
+  API_BASE_URL,
+  getAdminAnalytics,
+  getAdminProducts,
+  getAdminSuppliers,
+} from '../../lib/api';
 
 type AdminAnalytics = {
   summary: {
@@ -89,20 +95,21 @@ type AdminProduct = {
   status: 'pending' | 'approved' | 'rejected';
 };
 
-const API_BASE_URL =
-  ((import.meta as any)?.env?.VITE_API_URL as string) || 'http://127.0.0.1:8000/api';
-
 function getAccessToken() {
   return localStorage.getItem('access') || '';
 }
 
 async function apiRequest(path: string, options: RequestInit = {}) {
   const token = getAccessToken();
+  const method = String(options.method || 'GET').toUpperCase();
+  const isFormData = options.body instanceof FormData;
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(method !== 'GET' && method !== 'DELETE' && !isFormData
+        ? { 'Content-Type': 'application/json' }
+        : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
@@ -163,20 +170,6 @@ function formatStatusLabel(value?: string) {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-async function getAdminAnalytics() {
-  return await apiRequest('/admin/analytics/');
-}
-
-async function getAdminSuppliers() {
-  const data = await apiRequest('/admin/suppliers/');
-  return Array.isArray(data) ? data.map(normalizeSupplier) : [];
-}
-
-async function getAdminProducts() {
-  const data = await apiRequest('/admin/products/');
-  return Array.isArray(data) ? data.map(normalizeProduct) : [];
-}
-
 async function approveSupplier(supplierId: string) {
   const data = await apiRequest(`/admin/suppliers/${supplierId}/approve/`, {
     method: 'POST',
@@ -231,9 +224,9 @@ export default function AdminDashboard() {
           getAdminProducts(),
         ]);
 
-        setAnalytics(analyticsData);
-        setSuppliers(suppliersData);
-        setProducts(productsData);
+        setAnalytics(analyticsData as AdminAnalytics);
+        setSuppliers((suppliersData || []).map(normalizeSupplier));
+        setProducts((productsData || []).map(normalizeProduct));
       } catch (error: any) {
         console.error('Failed to load admin dashboard:', error);
         setPageError(error?.message || 'Failed to load dashboard data.');
